@@ -8,6 +8,8 @@ import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 
 const TEMPLATE_URL = 'https://pnpbakrzaadghhdiwjel.supabase.co/storage/v1/object/sign/templates/aartisanz-product-template-v3.xlsx?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83OWY3ZjBmMi05NmQ2LTRhODMtYmI4MS03NmFhNjM3NWViZTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZW1wbGF0ZXMvYWFydGlzYW56LXByb2R1Y3QtdGVtcGxhdGUtdjMueGxzeCIsImlhdCI6MTc3Nzc5MDk2NywiZXhwIjo0ODk5ODU0OTY3fQ.8VzAqNn5s8Ih6R7QK04b0wLEOBM8eN-j-PdYPliAmXM'
+
+const VALID_CATEGORIES = [
   'Kalamkari Sarees', 'Pochampally Ikat', 'Silk Sarees',
   'Cotton Sarees', 'Kalamkari Fabrics', 'Kalamkari Accessories', 'Kurtis & Frocks'
 ]
