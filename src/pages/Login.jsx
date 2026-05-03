@@ -6,9 +6,10 @@ import toast from 'react-hot-toast'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => localStorage.getItem('rememberedEmail') || '')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('rememberedEmail'))
   const [loading, setLoading] = useState(false)
   const { signIn } = useAuth()
   const navigate = useNavigate()
@@ -16,6 +17,8 @@ export default function Login() {
   async function handleSubmit(e) {
     e.preventDefault()
     setLoading(true)
+    if (rememberMe) localStorage.setItem('rememberedEmail', email)
+    else localStorage.removeItem('rememberedEmail')
     try {
       const { error } = await signIn(email, password)
       if (error) { toast.error(error.message); setLoading(false); return }
@@ -95,6 +98,17 @@ export default function Login() {
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 accent-brand-800 cursor-pointer"
+                />
+                <label htmlFor="rememberMe" className="text-sm text-gray-600 font-body cursor-pointer select-none">Remember me</label>
               </div>
 
               <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-3">

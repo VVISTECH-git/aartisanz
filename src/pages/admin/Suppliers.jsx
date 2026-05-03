@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Users, Plus, Loader2, Package, ShoppingBag, Phone, Mail } from 'lucide-react'
+import { Users, Plus, Loader2, Package, ShoppingBag, Phone, Mail, Trash2, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AdminSuppliers() {
@@ -8,6 +8,7 @@ export default function AdminSuppliers() {
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [deleting, setDeleting] = useState({})
   const [form, setForm] = useState({ full_name: '', email: '', phone: '', whatsapp: '', password: '' })
 
   useEffect(() => { fetchSuppliers() }, [])
@@ -22,6 +23,20 @@ export default function AdminSuppliers() {
     if (error) toast.error('Failed to load suppliers')
     else setSuppliers(data || [])
     setLoading(false)
+  }
+
+  async function deleteSupplier(id, name) {
+    if (!confirm(`Delete supplier "${name}"? This cannot be undone.`)) return
+    setDeleting(prev => ({ ...prev, [id]: true }))
+    try {
+      const { error } = await supabase.from('profiles').delete().eq('id', id)
+      if (error) throw error
+      toast.success('Supplier deleted')
+      setSuppliers(prev => prev.filter(s => s.id !== id))
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete supplier')
+    }
+    setDeleting(prev => ({ ...prev, [id]: false }))
   }
 
   async function addSupplier(e) {
@@ -115,7 +130,17 @@ export default function AdminSuppliers() {
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-heading font-semibold text-gray-900">{supplier.full_name}</h3>
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-heading font-semibold text-gray-900">{supplier.full_name}</h3>
+                    <button
+                      onClick={() => deleteSupplier(supplier.id, supplier.full_name)}
+                      disabled={deleting[supplier.id]}
+                      className="text-red-400 hover:text-red-600 transition-colors p-1 rounded"
+                      title="Delete supplier"
+                    >
+                      {deleting[supplier.id] ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    </button>
+                  </div>
                   <div className="flex items-center gap-3 mt-1">
                     <div className="flex items-center gap-1 text-xs text-gray-400 font-body">
                       <Mail size={11} /> {supplier.email}
@@ -124,6 +149,11 @@ export default function AdminSuppliers() {
                   {supplier.phone && (
                     <div className="flex items-center gap-1 text-xs text-gray-400 font-body mt-0.5">
                       <Phone size={11} /> {supplier.phone}
+                    </div>
+                  )}
+                  {supplier.whatsapp && (
+                    <div className="flex items-center gap-1 text-xs text-green-600 font-body mt-0.5">
+                      <MessageCircle size={11} /> {supplier.whatsapp}
                     </div>
                   )}
 
