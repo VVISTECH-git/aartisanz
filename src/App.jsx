@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import SupplierDashboard from './pages/supplier/Dashboard'
 import SupplierProducts from './pages/supplier/Products'
 import SupplierAddProduct from './pages/supplier/AddProduct'
+import SupplierBulkUpload from './pages/supplier/BulkUpload'
 import SupplierOrders from './pages/supplier/Orders'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminSuppliers from './pages/admin/Suppliers'
@@ -43,6 +44,7 @@ export default function App() {
             <Route index element={<SupplierDashboard />} />
             <Route path="products" element={<SupplierProducts />} />
             <Route path="products/add" element={<SupplierAddProduct />} />
+            <Route path="products/bulk-upload" element={<SupplierBulkUpload />} />
             <Route path="orders" element={<SupplierOrders />} />
           </Route>
 

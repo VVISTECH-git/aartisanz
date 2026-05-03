@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { calculateShopifyStock, getStockStatus, getBufferAmount } from '../../lib/bufferLogic'
-import { Plus, Edit2, Trash2, RefreshCw, Package, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Plus, Edit2, Trash2, RefreshCw, Package, Eye, EyeOff, Loader2, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function SupplierProducts() {
@@ -81,6 +81,9 @@ export default function SupplierProducts() {
           <button onClick={fetchProducts} className="btn-secondary flex items-center gap-2">
             <RefreshCw size={14} /> Refresh
           </button>
+          <Link to="/supplier/products/bulk-upload" className="btn-secondary flex items-center gap-2">
+            <Upload size={14} /> Bulk Upload
+          </Link>
           <Link to="/supplier/products/add" className="btn-primary flex items-center gap-2">
             <Plus size={14} /> Add Product
           </Link>
