@@ -90,24 +90,32 @@ export default function AdminDashboard() {
           <button
             onClick={async () => {
               setSyncing(true)
+              let totalSynced = 0
               try {
                 const { data: { session } } = await supabase.auth.getSession()
-                const res = await fetch(import.meta.env.VITE_SUPABASE_URL + '/functions/v1/bulk-sync', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + session.access_token,
-                    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
-                  },
-                  body: JSON.stringify({})
-                })
-                const data = await res.json()
-                if (data.success) {
-                  toast.success('Synced ' + data.synced + ' products to Shopify!')
+                let remaining = 999
+                while (remaining > 0) {
+                  const res = await fetch(import.meta.env.VITE_SUPABASE_URL + '/functions/v1/bulk-sync', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': 'Bearer ' + session.access_token,
+                      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify({})
+                  })
+                  const data = await res.json()
+                  if (!data.success) { toast.error(data.error || 'Sync failed'); break }
+                  totalSynced += data.synced || 0
+                  remaining = data.remaining || 0
                   fetchData()
-                } else toast.error(data.error || 'Sync failed')
+                  if (data.done || remaining <= 0) break
+                  await new Promise(r => setTimeout(r, 500))
+                }
+                toast.success('Synced ' + totalSynced + ' products to Shopify!')
               } catch (err) { toast.error('Sync failed: ' + err.message) }
               setSyncing(false)
+              fetchData()
             }}
             disabled={syncing || syncStats.failed === 0}
             className="btn-primary flex items-center gap-2 text-sm"

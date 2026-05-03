@@ -1,15 +1,12 @@
-// Supabase Edge Function: bulk-sync v3 - debug version
+// Supabase Edge Function: bulk-sync v4
+// Syncs products in batches of 20 to avoid timeout
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } })
   }
 
   try {
@@ -18,40 +15,41 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
     const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 
-    // Step 1: Check env vars
     if (!SHOPIFY_STORE) return respond({ error: 'SHOPIFY_STORE_URL is missing' }, 500)
     if (!SHOPIFY_TOKEN) return respond({ error: 'SHOPIFY_ACCESS_TOKEN is missing' }, 500)
-    if (!SUPABASE_URL) return respond({ error: 'SUPABASE_URL is missing' }, 500)
-    if (!SUPABASE_SERVICE_KEY) return respond({ error: 'SUPABASE_SERVICE_ROLE_KEY is missing' }, 500)
 
-    // Step 2: Test Shopify connection
-    let locationId: string | null = null
-    try {
-      const locRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/locations.json`, {
-        headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN }
-      })
-      const locText = await locRes.text()
-      if (!locRes.ok) return respond({ error: `Shopify auth failed: ${locRes.status}`, body: locText }, 500)
-      const locData = JSON.parse(locText)
-      locationId = locData.locations?.[0]?.id?.toString() || null
-    } catch (e) {
-      return respond({ error: `Shopify connection failed: ${e.message}` }, 500)
-    }
-
-    // Step 3: Fetch products from Supabase
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    const { data: products, error: dbError } = await supabase
+
+    // Get batch of 20 unsynced approved products
+    const { data: products, error } = await supabase
       .from('products')
       .select('id, name, sku, description, price, compare_price, shopify_stock, category, tags, fabric, color, images')
       .eq('is_approved', true)
       .is('shopify_product_id', null)
       .order('created_at', { ascending: true })
-      .limit(999999)
+      .limit(20)
 
-    if (dbError) return respond({ error: `DB error: ${dbError.message}` }, 500)
-    if (!products || products.length === 0) return respond({ success: true, message: 'No products to sync', synced: 0 })
+    if (error) return respond({ error: `DB error: ${error.message}` }, 500)
 
-    // Step 4: Sync products
+    if (!products || products.length === 0) {
+      return respond({ success: true, message: 'All products synced!', synced: 0, remaining: 0 })
+    }
+
+    // Get location ID
+    const locRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/locations.json`, {
+      headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN }
+    })
+    if (!locRes.ok) return respond({ error: `Shopify auth failed: ${locRes.status}` }, 500)
+    const locData = await locRes.json()
+    const locationId = locData.locations?.[0]?.id
+
+    // Count remaining after this batch
+    const { count: remaining } = await supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_approved', true)
+      .is('shopify_product_id', null)
+
     const results = { success: 0, failed: 0, errors: [] as string[] }
 
     for (const product of products) {
@@ -73,6 +71,9 @@ serve(async (req) => {
             product_type: product.category || 'Saree',
             tags,
             status: 'active',
+            images: Array.isArray(product.images) && product.images.length > 0
+              ? product.images.map((url: string, i: number) => ({ src: url, position: i + 1, alt: product.name }))
+              : [],
             variants: [{
               price: (product.price || 0).toString(),
               compare_at_price: product.compare_price ? product.compare_price.toString() : null,
@@ -87,10 +88,7 @@ serve(async (req) => {
 
         const shopRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/products.json`, {
           method: 'POST',
-          headers: {
-            'X-Shopify-Access-Token': SHOPIFY_TOKEN,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
           body: JSON.stringify(shopifyBody)
         })
 
@@ -105,14 +103,13 @@ serve(async (req) => {
             method: 'POST',
             headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              location_id: parseInt(locationId),
+              location_id: locationId,
               inventory_item_id: shopifyProduct.variants[0].inventory_item_id,
               available: product.shopify_stock || 0
             })
           })
         }
 
-        // Save Shopify IDs back to Supabase
         await supabase.from('products').update({
           shopify_product_id: shopifyProduct.id.toString(),
           shopify_variant_id: shopifyProduct.variants[0].id.toString(),
@@ -121,21 +118,25 @@ serve(async (req) => {
 
         results.success++
         console.log(`✅ ${results.success}/${products.length}: ${product.name}`)
-        await new Promise(r => setTimeout(r, 600))
+
+        // Small delay to respect rate limits
+        await new Promise(r => setTimeout(r, 300))
 
       } catch (err) {
         results.failed++
         results.errors.push(`${product.name}: ${err.message}`)
-        console.error(`❌ ${product.name}: ${err.message}`)
       }
     }
 
+    const totalRemaining = (remaining || 0) - results.success
+
     return respond({
       success: true,
-      total: products.length,
       synced: results.success,
       failed: results.failed,
-      errors: results.errors.slice(0, 20)
+      remaining: totalRemaining,
+      errors: results.errors,
+      done: totalRemaining <= 0
     })
 
   } catch (err) {
