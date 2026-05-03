@@ -7,7 +7,7 @@ import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, ArrowLeft, Down
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 
-const VALID_CATEGORIES = [
+const TEMPLATE_URL = 'https://pnpbakrzaadghhdiwjel.supabase.co/storage/v1/object/sign/templates/aartisanz-product-template-v3.xlsx?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83OWY3ZjBmMi05NmQ2LTRhODMtYmI4MS03NmFhNjM3NWViZTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZW1wbGF0ZXMvYWFydGlzYW56LXByb2R1Y3QtdGVtcGxhdGUtdjMueGxzeCIsImlhdCI6MTc3Nzc5MDk2NywiZXhwIjo0ODk5ODU0OTY3fQ.8VzAqNn5s8Ih6R7QK04b0wLEOBM8eN-j-PdYPliAmXM'
   'Kalamkari Sarees', 'Pochampally Ikat', 'Silk Sarees',
   'Cotton Sarees', 'Kalamkari Fabrics', 'Kalamkari Accessories', 'Kurtis & Frocks'
 ]
@@ -149,9 +149,9 @@ export default function SupplierBulkUpload() {
           <p className="text-sm text-gray-500 font-body mt-1">Use our Excel template to fill in your products</p>
         </div>
         <a
-          href="https://docs.google.com/spreadsheets/d/your-template-link"
+          href={TEMPLATE_URL}
+          download="aartisanz-product-template.xlsx"
           className="btn-secondary flex items-center gap-2"
-          onClick={(e) => { e.preventDefault(); toast('Ask admin for the template file!') }}
         >
           <Download size={14} /> Download Template
         </a>
