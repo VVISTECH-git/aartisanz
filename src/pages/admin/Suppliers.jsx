@@ -3,6 +3,9 @@ import { supabase } from '../../lib/supabase'
 import { Users, Plus, Loader2, Package, ShoppingBag, Phone, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_KEY
+
 export default function AdminSuppliers() {
   const [suppliers, setSuppliers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -28,14 +31,36 @@ export default function AdminSuppliers() {
     e.preventDefault()
     setAdding(true)
     try {
-      const { data, error } = await supabase.rpc('create_supplier_user', {
-        p_email: form.email,
-        p_password: form.password,
-        p_full_name: form.full_name,
-        p_phone: form.phone,
-        p_whatsapp: form.whatsapp
+      // Use Supabase Admin API directly
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SERVICE_KEY,
+          'Authorization': `Bearer ${SERVICE_KEY}`
+        },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+          email_confirm: true,
+          user_metadata: {
+            full_name: form.full_name,
+            role: 'supplier'
+          }
+        })
       })
-      if (error) throw error
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message || data.error || 'Failed to create user')
+
+      // Update profile with additional info
+      await supabase.from('profiles').update({
+        full_name: form.full_name,
+        phone: form.phone,
+        whatsapp_number: form.whatsapp,
+        role: 'supplier'
+      }).eq('email', form.email)
+
       toast.success('Supplier added! They can now login.')
       setShowAddForm(false)
       setForm({ full_name: '', email: '', phone: '', whatsapp: '', password: '' })
