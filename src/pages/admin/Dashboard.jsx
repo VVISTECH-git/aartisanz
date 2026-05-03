@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { Users, Package, ShoppingBag, AlertTriangle, TrendingUp, RefreshCw } from 'lucide-react'
+import { Users, Package, ShoppingBag, AlertTriangle, TrendingUp, RefreshCw, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import toast from 'react-hot-toast'
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ suppliers: 0, products: 0, orders: 0, pendingApprovals: 0, lowStock: 0, revenue: 0 })
+  const [syncStats, setSyncStats] = useState({ synced: 0, failed: 0, total: 0 })
+  const [syncing, setSyncing] = useState(false)
   const [recentOrders, setRecentOrders] = useState([])
   const [ordersByDay, setOrdersByDay] = useState([])
   const [loading, setLoading] = useState(true)
@@ -48,6 +50,11 @@ export default function AdminDashboard() {
         revenue
       })
       setRecentOrders(orders.slice(0, 8))
+
+      // Sync stats
+      const synced = products.filter(p => p.is_approved && p.shopify_product_id).length
+      const failed = products.filter(p => p.is_approved && !p.shopify_product_id).length
+      setSyncStats({ synced, failed, total: products.filter(p => p.is_approved).length })
       setOrdersByDay(last7)
     } catch (err) {
       toast.error('Failed to load dashboard')
@@ -74,6 +81,58 @@ export default function AdminDashboard() {
         <button onClick={fetchData} className="btn-secondary flex items-center gap-2">
           <RefreshCw size={14} /> Refresh
         </button>
+      </div>
+
+      {/* Shopify Sync Status */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-heading text-gray-900 font-semibold">Shopify Sync Status</h2>
+          <button
+            onClick={async () => {
+              setSyncing(true)
+              try {
+                const { data: { session } } = await supabase.auth.getSession()
+                const res = await fetch(import.meta.env.VITE_SUPABASE_URL + '/functions/v1/bulk-sync', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + session.access_token,
+                    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+                  },
+                  body: JSON.stringify({})
+                })
+                const data = await res.json()
+                if (data.success) {
+                  toast.success('Synced ' + data.synced + ' products to Shopify!')
+                  fetchData()
+                } else toast.error(data.error || 'Sync failed')
+              } catch (err) { toast.error('Sync failed: ' + err.message) }
+              setSyncing(false)
+            }}
+            disabled={syncing || syncStats.failed === 0}
+            className="btn-primary flex items-center gap-2 text-sm"
+          >
+            {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {syncing ? 'Syncing...' : 'Retry Failed (' + syncStats.failed + ')'}
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-green-50 rounded-lg p-3 text-center">
+            <CheckCircle size={20} className="text-green-600 mx-auto mb-1" />
+            <p className="text-xl font-heading font-bold text-green-700">{loading ? '...' : syncStats.synced}</p>
+            <p className="text-xs text-gray-500 font-body">Synced to Shopify</p>
+          </div>
+          <div className="bg-red-50 rounded-lg p-3 text-center">
+            <XCircle size={20} className="text-red-500 mx-auto mb-1" />
+            <p className="text-xl font-heading font-bold text-red-600">{loading ? '...' : syncStats.failed}</p>
+            <p className="text-xs text-gray-500 font-body">Not Synced</p>
+          </div>
+          <div className="bg-brand-50 rounded-lg p-3 text-center">
+            <Package size={20} className="text-brand-800 mx-auto mb-1" />
+            <p className="text-xl font-heading font-bold text-brand-800">{loading ? '...' : syncStats.total}</p>
+            <p className="text-xs text-gray-500 font-body">Total Approved</p>
+          </div>
+        </div>
       </div>
 
       {/* Stats grid */}
