@@ -37,19 +37,31 @@ export default function SupplierBulkUpload() {
     reader.onload = (evt) => {
       const wb = XLSX.read(evt.target.result, { type: 'binary' })
       const ws = wb.Sheets[wb.SheetNames[0]]
-      const data = XLSX.utils.sheet_to_json(ws, { defval: '' })
+      
+      // Find the actual header row by looking for 'Name' in column A
+      const data = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false })
+      
+      // Filter out rows where Name is empty or starts with 'Example:' or is a legend/note row
+      const filtered = data.filter(row => {
+        const name = (row['Name *'] || row['Name'] || row['name'] || '').toString().trim()
+        return name && 
+               !name.startsWith('Example:') && 
+               !name.startsWith('←') && 
+               !name.startsWith('↑') &&
+               !name.startsWith('↓')
+      })
 
       // Validate
       const errs = []
       const valid = []
 
-      data.forEach((row, i) => {
+      filtered.forEach((row, i) => {
         const rowNum = i + 2
-        const name = row['Name'] || row['name'] || ''
-        const sku = row['SKU'] || row['sku'] || ''
-        const category = row['Category'] || row['category'] || ''
-        const price = parseFloat(row['Price (₹)'] || row['price'] || 0)
-        const stock = parseInt(row['Stock'] || row['stock'] || 0)
+        const name = (row['Name *'] || row['Name'] || row['name'] || '').toString().trim()
+        const sku = (row['SKU *'] || row['SKU'] || row['sku'] || '').toString().trim()
+        const category = (row['Category *'] || row['Category'] || row['category'] || '').toString().trim()
+        const price = parseFloat(row['Price (₹) *'] || row['Price (₹)'] || row['price'] || 0)
+        const stock = parseInt(row['Stock *'] || row['Stock'] || row['stock'] || 0)
 
         if (!name) errs.push(`Row ${rowNum}: Name is required`)
         else if (!sku) errs.push(`Row ${rowNum}: SKU is required`)
@@ -62,13 +74,13 @@ export default function SupplierBulkUpload() {
             sku,
             category,
             price,
-            compare_price: parseFloat(row['Compare Price (₹)'] || row['compare_price'] || 0) || null,
+            compare_price: parseFloat(row['Compare Price (₹)'] || row['Compare Price (₹) *'] || row['compare_price'] || 0) || null,
             supplier_stock: stock,
             shopify_stock: calculateShopifyStock(stock),
-            fabric: row['Fabric'] || row['fabric'] || '',
-            color: row['Color'] || row['color'] || '',
-            occasion: row['Occasion'] || row['occasion'] || '',
-            description: row['Description'] || row['description'] || '',
+            fabric: (row['Fabric *'] || row['Fabric'] || row['fabric'] || '').toString().trim(),
+            color: (row['Color *'] || row['Color'] || row['color'] || '').toString().trim(),
+            occasion: (row['Occasion *'] || row['Occasion'] || row['occasion'] || '').toString().trim(),
+            description: (row['Description'] || row['description'] || '').toString().trim(),
           })
         }
       })
@@ -92,21 +104,25 @@ export default function SupplierBulkUpload() {
     reader.onload = async (evt) => {
       const wb = XLSX.read(evt.target.result, { type: 'binary' })
       const ws = wb.Sheets[wb.SheetNames[0]]
-      const data = XLSX.utils.sheet_to_json(ws, { defval: '' })
+      const allData = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false })
+      const data = allData.filter(row => {
+        const name = (row['Name *'] || row['Name'] || row['name'] || '').toString().trim()
+        return name && !name.startsWith('Example:') && !name.startsWith('←') && !name.startsWith('↑')
+      })
 
       const products = data.map(row => ({
         supplier_id: user.id,
-        name: row['Name'] || row['name'] || '',
-        sku: row['SKU'] || row['sku'] || '',
-        category: row['Category'] || row['category'] || '',
-        price: parseFloat(row['Price (₹)'] || row['price'] || 0),
+        name: (row['Name *'] || row['Name'] || row['name'] || '').toString().trim(),
+        sku: (row['SKU *'] || row['SKU'] || row['sku'] || '').toString().trim(),
+        category: (row['Category *'] || row['Category'] || row['category'] || '').toString().trim(),
+        price: parseFloat(row['Price (₹) *'] || row['Price (₹)'] || row['price'] || 0),
         compare_price: parseFloat(row['Compare Price (₹)'] || row['compare_price'] || 0) || null,
-        supplier_stock: parseInt(row['Stock'] || row['stock'] || 0),
-        shopify_stock: calculateShopifyStock(parseInt(row['Stock'] || row['stock'] || 0)),
-        fabric: row['Fabric'] || row['fabric'] || '',
-        color: row['Color'] || row['color'] || '',
-        tags: [row['Occasion'] || '', row['Color'] || '', row['Fabric'] || ''].filter(Boolean),
-        description: row['Description'] || row['description'] || '',
+        supplier_stock: parseInt(row['Stock *'] || row['Stock'] || row['stock'] || 0),
+        shopify_stock: calculateShopifyStock(parseInt(row['Stock *'] || row['Stock'] || row['stock'] || 0)),
+        fabric: (row['Fabric *'] || row['Fabric'] || row['fabric'] || '').toString().trim(),
+        color: (row['Color *'] || row['Color'] || row['color'] || '').toString().trim(),
+        tags: [(row['Occasion *'] || row['Occasion'] || ''), (row['Color *'] || row['Color'] || ''), (row['Fabric *'] || row['Fabric'] || '')].filter(Boolean),
+        description: (row['Description'] || row['description'] || '').toString().trim(),
         images: [],
         is_approved: false,
       }))
