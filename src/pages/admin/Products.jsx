@@ -40,10 +40,25 @@ export default function AdminProducts() {
     const { error } = await supabase.from('products')
       .update({ is_approved: true, shopify_stock: shopifyStock })
       .eq('id', productId)
-    if (error) toast.error('Failed to approve')
-    else {
-      toast.success('Approved!')
-      setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_approved: true, shopify_stock: shopifyStock } : p))
+    if (error) { toast.error('Failed to approve'); setApproving(prev => ({ ...prev, [productId]: false })); return }
+    toast.success('Approved! Syncing to Shopify...')
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_approved: true, shopify_stock: shopifyStock } : p))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(import.meta.env.VITE_SUPABASE_URL + '/functions/v1/shopify-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ product_id: productId, action: 'create' })
+      })
+      const data = await res.json()
+      if (data.success) toast.success('Synced to Shopify!')
+      else toast.error('Approved but sync failed: ' + (data.error || 'Unknown'))
+    } catch (err) {
+      toast.error('Approved but sync failed: ' + err.message)
     }
     setApproving(prev => ({ ...prev, [productId]: false }))
   }
