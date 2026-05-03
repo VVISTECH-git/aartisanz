@@ -28,11 +28,14 @@ export default function AdminSuppliers() {
     e.preventDefault()
     setAdding(true)
     try {
-      // Create auth user via admin API (edge function)
-      const { data, error } = await supabase.functions.invoke('create-supplier', {
-        body: { ...form, role: 'supplier' }
+      const { data, error } = await supabase.rpc('create_supplier_user', {
+        p_email: form.email,
+        p_password: form.password,
+        p_full_name: form.full_name,
+        p_phone: form.phone,
+        p_whatsapp: form.whatsapp
       })
-      if (error || data?.error) throw new Error(error?.message || data?.error)
+      if (error) throw error
       toast.success('Supplier added! They can now login.')
       setShowAddForm(false)
       setForm({ full_name: '', email: '', phone: '', whatsapp: '', password: '' })
@@ -57,7 +60,6 @@ export default function AdminSuppliers() {
         </button>
       </div>
 
-      {/* Add supplier form */}
       {showAddForm && (
         <div className="card p-5">
           <h2 className="font-heading text-gray-900 font-semibold mb-4">Add New Supplier</h2>
@@ -93,7 +95,6 @@ export default function AdminSuppliers() {
         </div>
       )}
 
-      {/* Suppliers list */}
       {suppliers.length === 0 ? (
         <div className="card p-12 text-center">
           <Users size={48} className="text-gray-300 mx-auto mb-4" />
@@ -122,22 +123,16 @@ export default function AdminSuppliers() {
                       <Phone size={11} /> {supplier.phone}
                     </div>
                   )}
-
                   <div className="flex gap-4 mt-3">
                     <div className="flex items-center gap-1.5">
                       <Package size={13} className="text-brand-600" />
-                      <span className="text-xs text-gray-500 font-body">
-                        {supplier.products?.[0]?.count || 0} products
-                      </span>
+                      <span className="text-xs text-gray-500 font-body">{supplier.products?.[0]?.count || 0} products</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <ShoppingBag size={13} className="text-green-600" />
-                      <span className="text-xs text-gray-500 font-body">
-                        {supplier.orders?.[0]?.count || 0} orders
-                      </span>
+                      <span className="text-xs text-gray-500 font-body">{supplier.orders?.[0]?.count || 0} orders</span>
                     </div>
                   </div>
-
                   <div className="mt-3 pt-3 border-t border-gray-100">
                     <span className="badge-green">Active</span>
                     <span className="text-xs text-gray-400 font-body ml-2">
